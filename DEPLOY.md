@@ -133,3 +133,26 @@ one hour on assets, so a hard refresh (Ctrl+Shift+R) is enough. The local
 Nothing here is Google-specific — it is a folder of static files. GitHub Pages,
 Netlify and Cloudflare Pages all work with the same folder, and Render or Fly
 will run `server.py` if you want the AI without a Google billing account.
+
+---
+
+## Option C — GitHub Pages (no card, no CLI, already half done)
+
+The repository is the site: `index.html` sits at its root and every path in
+the app is relative, so Pages can serve the branch as-is. Verified by serving
+the folder under a sub-path locally, which is exactly what Pages does.
+
+1. Open the repo → **Settings** → **Pages**
+2. **Source**: Deploy from a branch
+3. **Branch**: `main`, folder `/ (root)` → **Save**
+
+Live in about a minute at
+
+    https://khandelwallaveesha-commits.github.io/Byte-force-AI-Code-Archaeologist/
+
+Every later `git push` republishes it. `.nojekyll` is committed so Pages
+copies the files straight across instead of running them through Jekyll.
+
+The AI chat falls back to the built-in rule answers here, same as Option A —
+`server.py` is not running, and `js/lib/ai.js` builds its request URL from
+the page's own directory so it reports that cleanly instead of erroring.
