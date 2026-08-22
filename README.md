@@ -16,10 +16,22 @@ AI answers described below.
 
 ### Optional: AI-written answers
 
+Copy the template and fill in your key:
+
+```bash
+cp .env.example .env      # Windows:  copy .env.example .env
+# then edit .env and set AI_API_KEY=...
+python server.py
+```
+
+`.env` is git-ignored, so the key never reaches the repository, and it stays in
+the server process — it is never sent to the browser. A real environment
+variable still wins over `.env`, which is how a deployed instance should supply
+it:
+
 ```bash
 set AI_API_KEY=xai-...        # Windows cmd   (PowerShell: $env:AI_API_KEY="...")
 export AI_API_KEY=xai-...     # macOS / Linux
-python server.py
 ```
 
 | Variable | Default | |

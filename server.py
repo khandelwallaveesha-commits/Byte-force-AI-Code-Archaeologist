@@ -26,9 +26,14 @@ falls back to its own rule-based answers — so a demo never dies on stage.
 Run
 ---
     python server.py                 # no AI, rule-based answers
-    set AI_API_KEY=xai-...           # Windows (PowerShell: $env:AI_API_KEY="...")
-    export AI_API_KEY=xai-...        # macOS / Linux
-    python server.py
+
+To switch the AI on, put your key in a .env file next to this script:
+
+    AI_API_KEY=xai-...
+
+Copy .env.example to .env and fill it in. That file is git-ignored, so the
+key never reaches the repository. A real environment variable still wins
+over .env, which is how a deploy should supply it.
 
 Configuration (all optional except the key)
     AI_API_KEY    the key itself. Without it, AI is simply off.
@@ -50,6 +55,45 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_dotenv(path):
+    """
+    Read KEY=VALUE lines out of a .env file.
+
+    A real environment variable always wins, so a deploy that sets
+    AI_API_KEY properly is never overridden by a stale local file. No
+    dependency: python-dotenv would do more, but not more that this needs.
+    """
+    if not os.path.isfile(path):
+        return 0
+
+    loaded = 0
+    with open(path, encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[7:].lstrip()
+            if "=" not in line:
+                continue
+
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip()
+
+            # strip matching quotes; leave anything else exactly as written
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+
+            if key and key not in os.environ:
+                os.environ[key] = value
+                loaded += 1
+    return loaded
+
+
+DOTENV_COUNT = load_dotenv(os.path.join(ROOT, ".env"))
 
 API_KEY = os.environ.get("AI_API_KEY", "").strip()
 BASE_URL = os.environ.get("AI_BASE_URL", "https://api.x.ai/v1/chat/completions").strip()
@@ -202,6 +246,8 @@ def main():
     server = ThreadingHTTPServer((host, PORT), handler)
 
     print(f"AI Code Archaeologist  ->  http://localhost:{PORT}/")
+    if DOTENV_COUNT:
+        print(f"Settings   : read {DOTENV_COUNT} value(s) from .env")
     if API_KEY:
         print(f"AI answers : ON   model={MODEL}  via {BASE_URL}")
     else:
