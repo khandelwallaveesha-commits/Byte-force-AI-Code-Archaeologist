@@ -441,6 +441,35 @@
 .gedge.dimmed { opacity: .2; }
 .gedge.hot { stroke-width: 2.4; stroke-dasharray: 5 6; animation: dash-flow 1.4s linear infinite; }
 
+/* Lines never need to be clickable, and hit-testing several hundred of them
+   on every pointer move is most of what made the map feel heavy. */
+#graph-edges { pointer-events: none; }
+
+/* ---- tree view --------------------------------------------------------
+   Branches are solid and take the colour of the file they grow into, so a
+   glance shows where screens end and saved information begins. The dashed
+   lines are the extra links of whichever file is selected. */
+.gbranch { fill: none; stroke-width: 1.7; stroke-linecap: round;
+  transition: stroke .2s, opacity .2s, stroke-width .2s; }
+.gbranch.hot { stroke-width: 2.6; opacity: 1; }
+.gbranch.dimmed { opacity: .12; }
+.gedge.extra { stroke-dasharray: 4 5; stroke-width: 1.5; animation: none; }
+
+.tcaret { cursor: pointer; }
+.tcaret circle { transition: stroke .2s, fill .2s; }
+.tcaret:hover circle { stroke: var(--accent); fill: var(--bg-2); }
+.tcaret text { pointer-events: none; user-select: none; }
+.troot text { pointer-events: none; font-size: 12.5px; font-weight: 600; }
+.troot .sub { font-size: 9.5px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+
+/* A few hundred boxes each running an animation is a dropped frame budget.
+   Past that size the map goes still and stays responsive instead. */
+.graph-panel.heavy .gnode.impacted rect { animation: none; opacity: .95; }
+.graph-panel.heavy .gnode:hover rect { filter: none; stroke-width: 2; }
+.graph-panel.heavy .gnode rect,
+.graph-panel.heavy .gedge,
+.graph-panel.heavy .gbranch { transition: none; }
+
 .graph-controls {
   position: absolute; right: .7rem; bottom: .7rem;
   display: flex; flex-direction: column; gap: .3rem;
@@ -748,3 +777,5 @@
 .dash.dock-half .chat-log,
 .dash.dock-half #chat-stream,
 .dash.dock-half .chat-input-row { max-width: 78ch; margin-inline: auto; width: 100%; }
+
+

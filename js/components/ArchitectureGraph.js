@@ -14,7 +14,7 @@ import { qs, qsa, esc, sleep, prefersReduced } from '../lib/dom.js';
 
 const VIEW_W = 1240;
 const VIEW_H = 760;
-const MIN_K = 0.35;
+const MIN_K = 0.16;   // low enough that a big tree can actually be framed
 const MAX_K = 2.4;
 
 const layerColor = (layer) => `var(--layer-${layer === 'ui' ? 'ui' : layer === 'logic' ? 'logic' : layer === 'api' ? 'api' : 'data'})`;
@@ -77,6 +77,123 @@ function groupLabelPoint(a, b, span) {
   return { x: GROUP.x + GROUP.w + 74, y: (b.y + b.h + a.y) / 2 + 4 };
 }
 
+/* ----------------------------------------------------------------------
+   Tree view — the project as one trunk splitting into branches.
+
+   The trunk is the project itself. It splits into the files nothing else
+   uses (the places the app starts), and each of those splits into the files
+   it uses, and so on. Reading left to right follows the code outward.
+
+   Two things a naive drawing gets wrong, and how this avoids them:
+
+     · A file can be used by several others, but a tree gives every node one
+       parent. The first branch to reach it keeps it. The links that would
+       have been drawn twice are hidden until you click a file — otherwise
+       they cross the whole picture and it stops looking like a tree at all.
+     · Six separate roots floating in space do not read as a tree. The
+       project box joins them into one.
+
+   Branches collapse. A big project opens folded to its first two levels,
+   which is both readable and far cheaper to draw.
+   ---------------------------------------------------------------------- */
+
+const NODE_H = 44;   // matches the box height the layouts author
+const TREE_X = 196;   // horizontal step per level
+const TREE_ROW = 58;  // vertical pitch between sibling rows
+const ROOT_ID = '__project__';
+const ROOT_W = 150;
+const AUTO_FOLD_OVER = 45;   // files, above which the tree opens folded
+
+/** Parent/child structure. Computed once — folding never changes it. */
+function treeStructure(nodes, edges) {
+  const indeg = new Map(nodes.map((n) => [n.id, 0]));
+  edges.forEach((e) => { if (indeg.has(e.to)) indeg.set(e.to, indeg.get(e.to) + 1); });
+
+  const outOf = new Map(nodes.map((n) => [n.id, []]));
+  edges.forEach((e) => { if (outOf.has(e.from) && indeg.has(e.to)) outOf.get(e.from).push(e.to); });
+
+  /* Entry points first; if everything is used by something (a cycle), start
+     from whatever reaches the most. */
+  let starts = nodes.filter((n) => (indeg.get(n.id) || 0) === 0).map((n) => n.id);
+  if (!starts.length && nodes.length) {
+    starts = [[...nodes].sort((a, b) => (outOf.get(b.id) || []).length - (outOf.get(a.id) || []).length)[0].id];
+  }
+
+  const parent = new Map([[ROOT_ID, null]]);
+  const kids = new Map(nodes.map((n) => [n.id, []]));
+  kids.set(ROOT_ID, [...starts]);
+  starts.forEach((s) => parent.set(s, ROOT_ID));
+
+  const seen = new Set(starts);
+  const queue = [...starts];
+  while (queue.length) {
+    const id = queue.shift();
+    (outOf.get(id) || []).forEach((child) => {
+      if (seen.has(child)) return;              // already has a parent
+      seen.add(child);
+      parent.set(child, id);
+      kids.get(id).push(child);
+      queue.push(child);
+    });
+  }
+
+  /* Anything unreachable (islands, cycles) hangs off the trunk rather than
+     silently vanishing from the picture. */
+  nodes.forEach((n) => {
+    if (!seen.has(n.id)) { seen.add(n.id); parent.set(n.id, ROOT_ID); kids.get(ROOT_ID).push(n.id); }
+  });
+
+  const depth = new Map([[ROOT_ID, 0]]);
+  const order = [];
+  const walk = (id, d) => {
+    depth.set(id, d);
+    order.push(id);
+    (kids.get(id) || []).forEach((c) => walk(c, d + 1));
+  };
+  walk(ROOT_ID, 0);
+
+  const branchKey = new Set();
+  parent.forEach((p, id) => { if (p && p !== ROOT_ID) branchKey.add(`${p}>${id}`); });
+  const extra = edges.filter((e) => !branchKey.has(`${e.from}>${e.to}`));
+
+  return { parent, kids, depth, order, starts, extra };
+}
+
+/** Rows and coordinates for whatever is currently unfolded. */
+function layoutTree(struct, collapsed) {
+  const { kids, depth } = struct;
+  const rowOf = new Map();
+  const positions = new Map();
+  const visible = new Set();
+  let nextRow = 0;
+
+  const place = (id) => {
+    visible.add(id);
+    const cs = collapsed.has(id) ? [] : (kids.get(id) || []);
+    if (!cs.length) { rowOf.set(id, nextRow++); return rowOf.get(id); }
+    const ys = cs.map(place);
+    const mid = (ys[0] + ys[ys.length - 1]) / 2;
+    rowOf.set(id, mid);
+    return mid;
+  };
+  place(ROOT_ID);
+
+  visible.forEach((id) => {
+    positions.set(id, {
+      x: 40 + (depth.get(id) || 0) * TREE_X,
+      y: 40 + (rowOf.get(id) || 0) * TREE_ROW,
+    });
+  });
+
+  const branch = [];
+  visible.forEach((id) => {
+    if (collapsed.has(id)) return;
+    (kids.get(id) || []).forEach((c) => { if (visible.has(c)) branch.push({ from: id, to: c }); });
+  });
+
+  return { positions, visible, branch };
+}
+
 export function graphPanel() {
   return `
   <section class="panel graph-panel view-layers" aria-label="Architecture graph">
@@ -85,6 +202,7 @@ export function graphPanel() {
       <div class="row" style="gap:.4rem">
         <div class="tabs" id="g-view" role="tablist" aria-label="Graph detail">
           <button class="tab active" data-view="layers" role="tab" aria-selected="true">${isPlain() ? 'Groups' : 'Layers'}</button>
+          <button class="tab" data-view="tree" role="tab" aria-selected="false">${isPlain() ? 'Branches' : 'Tree'}</button>
           <button class="tab" data-view="modules" role="tab" aria-selected="false">${isPlain() ? 'Every file' : 'All modules'}</button>
         </div>
         <button class="btn btn-sm btn-ghost" id="g-impact-mode" data-tip="Blast radius of the selected node">
@@ -146,7 +264,13 @@ export function mountGraph(root, onSelect) {
   const hint     = qs('#graph-hint', root);
 
   /* whatever project is currently loaded — sample or freshly analysed */
-  const { nodes: SOURCE_NODES, edges } = getProject();
+  const { nodes: SOURCE_NODES, edges, meta: PROJECT_META } = getProject();
+
+  /* A few hundred paths each running an infinite dash animation is what made
+     a large project crawl: the browser repaints the whole SVG every frame.
+     Past this many links the lines are drawn still, which nobody misses. */
+  const flowClass = edges.length <= 90 ? 'gedge flow' : 'gedge';
+  const HEAVY = SOURCE_NODES.length > 70 || edges.length > 90;
 
   /* mutable layout copy — dragging moves these, source data stays clean */
   const layout = new Map(SOURCE_NODES.map((n) => [n.id, { ...n }]));
@@ -155,10 +279,27 @@ export function mountGraph(root, onSelect) {
   let selected = null;
   let impactSet = null;   // Set<string> — blast radius
   let hintTimer = null;
-  let viewMode = 'layers'; // start zoomed out: four groups, not 19 modules
+  let viewMode = 'layers'; // start zoomed out: groups, not every file
 
   const { pairs: LAYER_PAIRS, internal: LAYER_INTERNAL, present: LAYER_PRESENT } =
     aggregateEdges(SOURCE_NODES, edges);
+
+  const TREE = treeStructure(SOURCE_NODES, edges);
+  const collapsed = new Set();
+  /* A big project opens folded past the second level: readable, and a
+     fraction of the boxes to draw. */
+  if (SOURCE_NODES.length > AUTO_FOLD_OVER) {
+    /* A big project opens at the starting points only; a middling one keeps
+       two levels. Either way the first screen is something you can read. */
+    const foldFrom = SOURCE_NODES.length > 120 ? 1 : 2;
+    TREE.order.forEach((id) => {
+      if ((TREE.depth.get(id) || 0) >= foldFrom && (TREE.kids.get(id) || []).length) collapsed.add(id);
+    });
+  }
+  let LAY = layoutTree(TREE, collapsed);
+
+  /* The banded positions authored in the data, kept so switching back is exact. */
+  const BAND_POS = new Map(SOURCE_NODES.map((n) => [n.id, { x: n.x, y: n.y }]));
 
   /* ---------------- geometry ---------------- */
 
@@ -196,18 +337,17 @@ export function mountGraph(root, onSelect) {
     edgeG.innerHTML = edges.map((e, i) => {
       const a = layout.get(e.from), b = layout.get(e.to);
       if (!a || !b) return '';
-      return `<path class="gedge flow" data-from="${e.from}" data-to="${e.to}"
+      return `<path class="${flowClass}" data-from="${e.from}" data-to="${e.to}"
                 d="${edgePath(a, b)}" stroke="var(--text-faint)" opacity=".45"
                 marker-end="url(#arrow)" style="animation-delay:${(i % 7) * 0.4}s"/>`;
     }).join('');
   }
 
-  function renderNodes() {
-    nodeG.innerHTML = SOURCE_NODES.map((src) => {
-      const n = layout.get(src.id);
-      const color = layerColor(n.layer);
-      const crit = n.importance === 'HIGH';
-      return `
+  function nodeMarkup(src, extras = '') {
+    const n = layout.get(src.id);
+    const color = layerColor(n.layer);
+    const crit = n.importance === 'HIGH';
+    return `
         <g class="gnode" data-id="${n.id}" transform="translate(${n.x},${n.y})"
            tabindex="0" role="button" aria-label="${esc(n.name)} — ${esc(n.purpose)}">
           <rect width="${n.w}" height="${n.h}" rx="9"
@@ -216,8 +356,12 @@ export function mountGraph(root, onSelect) {
           <text x="12" y="19" fill="var(--text)">${esc(n.name)}</text>
           <text x="12" y="33" class="sub" fill="var(--text-faint)">${esc(isPlain() ? groupLabel(n.layer) : `${LAYERS[n.layer].label} · ${n.fns} fns`)}</text>
           ${crit ? `<circle cx="${n.w - 11}" cy="13" r="3.2" fill="var(--high)"/>` : ''}
+          ${extras}
         </g>`;
-    }).join('');
+  }
+
+  function renderNodes() {
+    nodeG.innerHTML = SOURCE_NODES.map((n) => nodeMarkup(n)).join('');
   }
 
   /* ---------------- layer (zoomed-out) view ---------------- */
@@ -273,10 +417,157 @@ export function mountGraph(root, onSelect) {
     }).join('');
   }
 
-  function refreshEdgeGeometry() {
-    edgeG.querySelectorAll('path').forEach((p) => {
-      const a = layout.get(p.dataset.from), b = layout.get(p.dataset.to);
-      if (a && b) p.setAttribute('d', edgePath(a, b));
+  /* ---------------- tree view ---------------- */
+
+  /** Point the mutable layout at whichever arrangement is showing. */
+  function applyPositions(which) {
+    const src = which === 'tree' ? LAY.positions : BAND_POS;
+    layout.forEach((n, id) => {
+      const p = src.get(id);
+      if (p) { n.x = p.x; n.y = p.y; }
+    });
+  }
+
+  /** Box for anything on the tree, including the synthetic project trunk. */
+  function treeBox(id) {
+    if (id === ROOT_ID) {
+      const p = LAY.positions.get(ROOT_ID);
+      return p && { x: p.x, y: p.y, w: ROOT_W, h: NODE_H };
+    }
+    return LAY.visible.has(id) ? layout.get(id) : null;
+  }
+
+  /* A branch: out of the right of the parent, into the left of the child,
+     with a flat shoulder so siblings share one visible fork. */
+  function branchPath(a, b) {
+    const x1 = a.x + a.w, y1 = a.y + a.h / 2;
+    const x2 = b.x, y2 = b.y + b.h / 2;
+    const knee = x1 + Math.min(46, (x2 - x1) / 2);
+    return `M${x1},${y1} H${knee - 12} C${knee + 10},${y1} ${knee - 6},${y2} ${knee + 22},${y2} H${x2}`;
+  }
+
+  /* A shared file's other users, drawn as a long arc so it reads as an aside
+     rather than as part of the branch structure. */
+  function extraPath(a, b) {
+    const ax = a.x + a.w / 2, ay = a.y + a.h / 2;
+    const bx = b.x + b.w / 2, by = b.y + b.h / 2;
+    const lift = Math.min(120, Math.abs(by - ay) / 2 + 30);
+    return `M${ax},${ay} C${ax + lift},${ay} ${bx - lift},${by} ${bx},${by}`;
+  }
+
+  function renderTreeEdges() {
+    edgeG.innerHTML = LAY.branch.map((e) => {
+      const a = treeBox(e.from), b = treeBox(e.to);
+      if (!a || !b) return '';
+      const kid = layout.get(e.to);
+      return `<path class="gbranch" data-from="${e.from}" data-to="${e.to}"
+                d="${branchPath(a, b)}" stroke="${kid ? layerColor(kid.layer) : 'var(--accent)'}"
+                opacity=".42"/>`;
+    }).join('');
+  }
+
+  /**
+   * The links a tree cannot draw — a file used by more than one branch.
+   * Drawn only for the file you clicked, so the picture stays a tree
+   * instead of turning back into spaghetti, and nothing is hidden.
+   */
+  function renderTreeExtras(who) {
+    qsa('.gedge.extra', edgeG).forEach((p) => p.remove());
+    if (!who) return;
+    const ids = new Set(Array.isArray(who) ? who : [who]);
+    const mine = TREE.extra.filter((e) => ids.has(e.from) || ids.has(e.to));
+    const html = mine.map((e) => {
+      const a = treeBox(e.from), b = treeBox(e.to);
+      if (!a || !b) return '';
+      return `<path class="gedge extra" data-from="${e.from}" data-to="${e.to}"
+                d="${extraPath(a, b)}"
+                stroke="var(--accent)" opacity=".5" marker-end="url(#arrow-hot)"/>`;
+    }).join('');
+    edgeG.insertAdjacentHTML('beforeend', html);
+  }
+
+  /** How many files hang off this one, all the way down. */
+  function subtreeSize(id) {
+    let total = 0;
+    const stack = [...(TREE.kids.get(id) || [])];
+    while (stack.length) {
+      const cur = stack.pop();
+      total += 1;
+      (TREE.kids.get(cur) || []).forEach((c) => stack.push(c));
+    }
+    return total;
+  }
+
+  function renderTreeNodes() {
+    const caret = (id) => {
+      const kids = TREE.kids.get(id) || [];
+      if (!kids.length) return '';
+      const shut = collapsed.has(id);
+      const hidden = shut ? subtreeSize(id) : 0;
+      const n = id === ROOT_ID ? { w: ROOT_W, h: NODE_H } : layout.get(id);
+      /* sits on the branch itself, like a knot where it forks */
+      return `<g class="tcaret" data-fold="${id}" transform="translate(${n.w + 9},${n.h / 2})"
+                 role="button" tabindex="0"
+                 aria-label="${shut ? `Open the ${hidden} file${hidden === 1 ? '' : 's'} folded away here` : 'Fold this branch away'}">
+                <circle r="9.5" fill="var(--bg-3)" stroke="${shut ? 'var(--accent)' : 'var(--line)'}"/>
+                <text y="4" text-anchor="middle" font-size="${hidden > 99 ? 8.5 : 10.5}"
+                      fill="${shut ? 'var(--accent)' : 'var(--text-dim)'}"
+                      font-family="Inter, sans-serif">${shut ? hidden : '–'}</text>
+              </g>`;
+    };
+
+    const rootPos = LAY.positions.get(ROOT_ID) || { x: 40, y: 40 };
+    const name = (PROJECT_META && PROJECT_META.name) || 'This project';
+
+    const trunk = `
+      <g class="troot" transform="translate(${rootPos.x},${rootPos.y})">
+        <rect width="${ROOT_W}" height="${NODE_H}" rx="10"
+              fill="var(--bg-2)" stroke="var(--accent)" stroke-width="1.6"/>
+        <rect width="4" height="${NODE_H}" rx="2" fill="var(--accent)"/>
+        <text x="13" y="19" fill="var(--text)">${esc(name)}</text>
+        <text x="13" y="33" class="sub" fill="var(--text-faint)">${
+          isPlain() ? 'Starts here' : `${TREE.starts.length} entry point${TREE.starts.length === 1 ? '' : 's'}`}</text>
+        ${caret(ROOT_ID)}
+      </g>`;
+
+    nodeG.innerHTML = trunk + SOURCE_NODES
+      .filter((n) => LAY.visible.has(n.id))
+      .map((n) => nodeMarkup(n, caret(n.id)))
+      .join('');
+  }
+
+  function relayoutTree({ keepView = true } = {}) {
+    LAY = layoutTree(TREE, collapsed);
+    applyPositions('tree');
+    renderTreeEdges();
+    renderTreeNodes();
+    renderTreeExtras(selected);
+    if (!keepView) fit();
+    paint();
+  }
+
+  /** Unfold every branch above a file so selecting it can actually show it. */
+  function revealInTree(id) {
+    let p = TREE.parent.get(id);
+    let changed = false;
+    while (p) {
+      if (collapsed.delete(p)) changed = true;
+      p = TREE.parent.get(p);
+    }
+    return changed;
+  }
+
+  function refreshEdgeGeometry(only) {
+    const paths = only
+      ? edgeG.querySelectorAll(`path[data-from="${only}"], path[data-to="${only}"]`)
+      : edgeG.querySelectorAll('path');
+    const tree = viewMode === 'tree';
+    paths.forEach((p) => {
+      const a = tree ? treeBox(p.dataset.from) : layout.get(p.dataset.from);
+      const b = tree ? treeBox(p.dataset.to) : layout.get(p.dataset.to);
+      if (!a || !b) return;
+      if (!tree) { p.setAttribute('d', edgePath(a, b)); return; }
+      p.setAttribute('d', p.classList.contains('extra') ? extraPath(a, b) : branchPath(a, b));
     });
   }
 
@@ -298,6 +589,7 @@ export function mountGraph(root, onSelect) {
 
     nodeG.querySelectorAll('.gnode').forEach((g) => {
       const id = g.dataset.id;
+      if (!layout.has(id)) return;
       const inImpact = impactSet && impactSet.has(id);
       g.classList.toggle('selected', id === selected);
       g.classList.toggle('impacted', Boolean(inImpact));
@@ -314,8 +606,10 @@ export function mountGraph(root, onSelect) {
       }
     });
 
+    const tree = viewMode === 'tree';
     edgeG.querySelectorAll('path').forEach((p) => {
       const { from, to } = p.dataset;
+      if (p.classList.contains('extra')) return;   // drawn only for the selection already
       const touching = selected && (from === selected || to === selected);
       const inImpact = impactSet && impactSet.has(from) && (impactSet.has(to) || to === selected);
 
@@ -330,6 +624,12 @@ export function mountGraph(root, onSelect) {
         p.setAttribute('stroke', 'var(--accent)');
         p.setAttribute('marker-end', 'url(#arrow-hot)');
         p.setAttribute('opacity', '.95');
+      } else if (tree) {
+        /* branches keep the colour of the file they grow into */
+        const kid = layout.get(to);
+        p.setAttribute('stroke', kid ? layerColor(kid.layer) : 'var(--accent)');
+        p.removeAttribute('marker-end');
+        p.setAttribute('opacity', '.42');
       } else {
         p.setAttribute('stroke', 'var(--text-faint)');
         p.setAttribute('marker-end', 'url(#arrow)');
@@ -360,7 +660,10 @@ export function mountGraph(root, onSelect) {
     const xs = [], ys = [];
     const boxes = viewMode === 'layers'
       ? LAYER_PRESENT.map((l, i) => groupRectAt(i))
-      : Array.from(layout.values());
+      : viewMode === 'tree'
+        ? Array.from(LAY.visible, (id) => treeBox(id)).filter(Boolean)
+        : Array.from(layout.values());
+    if (!boxes.length) return;
     boxes.forEach((n) => { xs.push(n.x, n.x + n.w); ys.push(n.y, n.y + n.h); });
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -369,7 +672,21 @@ export function mountGraph(root, onSelect) {
       (VIEW_H - padding * 2) / (maxY - minY),
       MAX_K
     );
-    view.k = Math.max(MIN_K, k);
+    /* A tree with a hundred branches cannot be framed whole at a size anyone
+       can read. Rather than open on a hairline, start at the trunk at a
+       readable zoom and let the reader scroll down the branches. */
+    if (viewMode === 'tree' && k < 0.45) {
+      const root = LAY.positions.get(ROOT_ID) || { x: 40, y: 40 };
+      view.k = 0.8;
+      view.x = 60 - root.x * view.k;
+      view.y = VIEW_H / 2 - (root.y + NODE_H / 2) * view.k;
+      applyView();
+      return;
+    }
+
+    /* "show me everything" has to be allowed past the zoom floor, or a tall
+       tree gets framed at a size that leaves half of it off screen. */
+    view.k = Math.max(0.06, k);
     view.x = (VIEW_W - (maxX - minX) * view.k) / 2 - minX * view.k;
     view.y = (VIEW_H - (maxY - minY) * view.k) / 2 - minY * view.k;
     applyView();
@@ -390,6 +707,11 @@ export function mountGraph(root, onSelect) {
 
   canvas.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
+
+    /* folding a branch is a click, never the start of a drag */
+    const fold = e.target.closest('.tcaret');
+    if (fold) { e.preventDefault(); toggleFold(fold.dataset.fold); return; }
+
     const nodeEl = e.target.closest('.gnode');
     moved = false;
     canvas.setPointerCapture(e.pointerId);
@@ -409,28 +731,43 @@ export function mountGraph(root, onSelect) {
     }
   });
 
-  canvas.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    moved = true;
+  /* One update per animation frame. A pointer fires far faster than the
+     screen refreshes, and rewriting hundreds of paths per event is exactly
+     what made dragging a big project feel stuck. */
+  let frame = null;
+  let pending = null;
 
+  function applyDrag(e) {
     if (drag.type === 'pan') {
       const scale = VIEW_W / canvas.clientWidth;
-      view.x = drag.ox + (e.clientX - drag.sx) * scale;
-      view.y = drag.oy + (e.clientY - drag.sy) * scale;
+      view.x = drag.ox + (e.x - drag.sx) * scale;
+      view.y = drag.oy + (e.y - drag.sy) * scale;
       applyView();
       return;
     }
-
-    const p = toGraph(e.clientX, e.clientY);
+    const p = toGraph(e.x, e.y);
     const n = layout.get(drag.id);
     n.x = p.x - drag.dx;
     n.y = p.y - drag.dy;
     drag.el.setAttribute('transform', `translate(${n.x},${n.y})`);
-    refreshEdgeGeometry();
+    refreshEdgeGeometry(drag.id);   // only the lines touching this box moved
+  }
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    moved = true;
+    pending = { x: e.clientX, y: e.clientY };
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = null;
+      if (drag && pending) applyDrag(pending);
+    });
   });
 
   const endDrag = (e) => {
     if (!drag) return;
+    if (frame) { cancelAnimationFrame(frame); frame = null; }
+    pending = null;
     if (drag.type === 'node' && !moved) select(drag.id, true);
     if (drag.type === 'pan' && drag.group && !moved) expandLayer(drag.group);
     canvas.classList.remove('grabbing');
@@ -452,11 +789,13 @@ export function mountGraph(root, onSelect) {
   /* keyboard: nodes and groups are focusable, Enter/Space activates */
   nodeG.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
+    const fold = e.target.closest('.tcaret');
     const g = e.target.closest('.gnode');
     const l = e.target.closest('.lnode');
-    if (!g && !l) return;
+    if (!fold && !g && !l) return;
     e.preventDefault();
-    if (g) select(g.dataset.id, true);
+    if (fold) toggleFold(fold.dataset.fold);
+    else if (g) select(g.dataset.id, true);
     else expandLayer(l.dataset.layer);
   });
 
@@ -474,8 +813,19 @@ export function mountGraph(root, onSelect) {
   /* ---------------- view mode ---------------- */
 
   function renderCurrent() {
-    if (viewMode === 'layers') { renderLayerEdges(); renderLayerNodes(); }
-    else { renderEdges(); renderNodes(); }
+    if (viewMode === 'layers') {
+      renderLayerEdges();
+      renderLayerNodes();
+    } else if (viewMode === 'tree') {
+      applyPositions('tree');
+      renderTreeEdges();
+      renderTreeNodes();
+      renderTreeExtras(selected);
+    } else {
+      applyPositions('modules');
+      renderNodes();
+      renderEdges();
+    }
     fit();
     paint();
   }
@@ -484,6 +834,7 @@ export function mountGraph(root, onSelect) {
     if (mode === viewMode) return;
     viewMode = mode;
     panel.classList.toggle('view-layers', mode === 'layers');
+    panel.classList.toggle('view-tree', mode === 'tree');
     qsa('[data-view]', root).forEach((b) => {
       const on = b.dataset.view === mode;
       b.classList.toggle('active', on);
@@ -491,10 +842,26 @@ export function mountGraph(root, onSelect) {
     });
     renderCurrent();
     if (!quiet) {
-      showHint(mode === 'layers'
-        ? 'Zoomed out — click a group to see the files inside'
-        : `All ${SOURCE_NODES.length} files`, 2600);
+      showHint(
+        mode === 'layers' ? 'Zoomed out — click a group to see the files inside'
+        : mode === 'tree' ? 'The project splits into branches — click a circle to open or fold one, click a file to see its other links'
+        : `All ${SOURCE_NODES.length} files`, 3400);
     }
+  }
+
+  /** Fold or unfold one branch of the tree. */
+  function toggleFold(id) {
+    if (!id) return;
+    const shut = collapsed.has(id);
+    if (shut) collapsed.delete(id); else collapsed.add(id);
+    relayoutTree();
+    const kids = (TREE.kids.get(id) || []).length;
+    const label = id === ROOT_ID
+      ? (PROJECT_META && PROJECT_META.name) || 'this project'
+      : (layout.get(id) || {}).name || id;
+    showHint(shut
+      ? `${label} splits into ${kids} file${kids === 1 ? '' : 's'}`
+      : `Folded ${label} away`, 2200);
   }
 
   /** Opening a group drops into module view with that layer highlighted. */
@@ -509,8 +876,12 @@ export function mountGraph(root, onSelect) {
     if (first.length && typeof onSelect === 'function') onSelect(first[0].id);
   }
 
-  /* Anything that needs a specific module forces the detailed view. */
-  const ensureModules = () => setViewMode('modules', { quiet: true });
+  /* Anything that needs a specific file forces a view that shows files.
+     The tree already does, so leave it alone — switching would throw the
+     reader out of the branch they were following. */
+  const ensureModules = () => {
+    if (viewMode === 'layers') setViewMode('modules', { quiet: true });
+  };
 
   /* ---------------- public API ---------------- */
 
@@ -518,14 +889,28 @@ export function mountGraph(root, onSelect) {
     ensureModules();
     selected = id;
     impactSet = null;
-    paint();
+    if (viewMode === 'tree') {
+      /* a folded-away file cannot be shown, so open the branches above it */
+      if (revealInTree(id)) relayoutTree();
+      else { renderTreeExtras(id); paint(); }
+    } else {
+      paint();
+    }
     if (notify && typeof onSelect === 'function') onSelect(id);
   }
 
   function setImpact(ids) {
     ensureModules();
     impactSet = ids && ids.length ? new Set(ids) : null;
-    paint();
+    if (viewMode === 'tree') {
+      /* every affected file has to be on screen or the answer looks smaller
+         than it is */
+      let opened = false;
+      if (impactSet) impactSet.forEach((id) => { if (revealInTree(id)) opened = true; });
+      if (opened) relayoutTree(); else paint();
+    } else {
+      paint();
+    }
     if (impactSet) showHint(isPlain()
       ? `${impactSet.size} file${impactSet.size === 1 ? '' : 's'} would be affected`
       : `${impactSet.size} module${impactSet.size === 1 ? '' : 's'} in the blast radius`, 3200);
@@ -538,6 +923,14 @@ export function mountGraph(root, onSelect) {
     const fast = prefersReduced();
     impactSet = null;
     selected = null;
+
+    if (viewMode === 'tree') {
+      /* every hop has to be unfolded and drawn, or the walk stops halfway */
+      let opened = false;
+      path.forEach((id) => { if (revealInTree(id)) opened = true; });
+      if (opened) { LAY = layoutTree(TREE, collapsed); applyPositions('tree'); renderTreeEdges(); renderTreeNodes(); fit(); }
+      renderTreeExtras(path);
+    }
     paint();
 
     nodeG.querySelectorAll('.gnode').forEach((g) => {
@@ -571,12 +964,14 @@ export function mountGraph(root, onSelect) {
     selected = null;
     impactSet = null;
     nodeG.querySelectorAll('.gnode').forEach((g) => g.classList.remove('selected', 'dimmed', 'impacted'));
+    if (viewMode === 'tree') renderTreeExtras(null);
     paint();
   }
 
   qsa('[data-view]', root).forEach((b) =>
     b.addEventListener('click', () => setViewMode(b.dataset.view)));
 
+  panel.classList.toggle('heavy', HEAVY);
   renderCurrent();
   setTimeout(() => { hint.style.opacity = '0'; }, 5200);
   hint.style.transition = 'opacity .5s';
