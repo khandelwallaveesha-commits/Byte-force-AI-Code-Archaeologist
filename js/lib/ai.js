@@ -24,10 +24,18 @@ const MAX_NEIGHBOURS = 4;
 
 let status = { enabled: false, model: null, reason: 'not checked yet' };
 
+/*
+ * Built from the directory the page is served from, not from the site root.
+ * GitHub Pages serves a project under /repo-name/, so an absolute /api/...
+ * would leave the site entirely. This way the same build works locally
+ * against server.py and hosted under any sub-path.
+ */
+const apiUrl = (name) => new URL(`api/${name}`, `${location.origin}${location.pathname}`).href;
+
 /** Ask the server once whether a key is configured. */
 export async function initAI() {
   try {
-    const res = await fetch('/api/ai-status');
+    const res = await fetch(apiUrl('ai-status'));
     if (!res.ok) throw new Error(String(res.status));
     status = await res.json();
   } catch (e) {
@@ -126,7 +134,7 @@ export async function askAI(question, node) {
   if (!status.enabled) return { error: status.reason, fallback: true };
 
   try {
-    const res = await fetch('/api/ask', {
+    const res = await fetch(apiUrl('ask'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question, context: buildContext(node) }),
