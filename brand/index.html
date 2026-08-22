@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Code Archaeologist — logo</title>
+<link rel="icon" href="mark.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07090f; --bg-1: #0c1018; --line: #222a37;
+    --text: #e8ecf3; --dim: #98a2b3; --faint: #6b7383;
+    --accent: #38e0d0; --accent-2: #4d9fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: Inter, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6; padding: clamp(1.5rem, 5vw, 4rem);
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); letter-spacing: -.03em; margin: 0 0 .4rem; }
+  h2 {
+    font-size: .78rem; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--accent);
+    margin: 3rem 0 1rem;
+  }
+  p.lede { color: var(--dim); margin: 0 0 2.5rem; max-width: 62ch; }
+
+  .hero {
+    display: grid; place-items: center; gap: 1.5rem;
+    padding: clamp(2rem, 6vw, 4rem);
+    border: 1px solid var(--line); border-radius: 22px;
+    background: radial-gradient(700px circle at 50% 0%, rgba(56,224,208,.10), transparent 65%), var(--bg-1);
+  }
+  .hero img { width: min(260px, 60vw); height: auto; }
+
+  .lockup { display: flex; align-items: center; gap: 1rem; }
+  .lockup img { width: 62px; height: 62px; }
+  .lockup .name { font-size: 1.7rem; font-weight: 600; letter-spacing: -.03em; }
+  .lockup .name b { color: var(--accent); font-weight: 600; }
+  .lockup .tag { font-size: .82rem; color: var(--faint); margin-top: .1rem; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; }
+  .card {
+    display: grid; place-items: center; gap: .9rem;
+    padding: 1.6rem 1rem;
+    border: 1px solid var(--line); border-radius: 14px; background: var(--bg-1);
+  }
+  .card.light { background: #f7f8fa; border-color: #e2e6ee; }
+  .card .label { font-size: .74rem; color: var(--faint); letter-spacing: .06em; text-transform: uppercase; }
+  .card.light .label { color: #6b7280; }
+
+  .sizes { display: flex; align-items: flex-end; gap: 2rem; flex-wrap: wrap; padding: 1.6rem; }
+  .sizes figure { margin: 0; display: grid; justify-items: center; gap: .5rem; }
+  .sizes figcaption { font-size: .72rem; color: var(--faint); font-family: "JetBrains Mono", monospace; }
+
+  pre {
+    margin: 0; padding: 1rem 1.1rem; overflow-x: auto;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1);
+    font-family: "JetBrains Mono", monospace; font-size: .78rem; line-height: 1.7;
+    color: var(--dim);
+  }
+  pre b { color: var(--accent); font-weight: 400; }
+  table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+  td, th { text-align: left; padding: .6rem .5rem; border-bottom: 1px solid var(--line); }
+  th { color: var(--faint); font-weight: 500; font-size: .76rem; text-transform: uppercase; letter-spacing: .07em; }
+  td.mono { font-family: "JetBrains Mono", monospace; font-size: .8rem; color: var(--accent); }
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--line); color: var(--faint); font-size: .8rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>The animated logo</h1>
+  <p class="lede">
+    A scanning lens: the outer ring sweeps, the inner ring counter-rotates, and three
+    markers blink on in sequence as the scan turns things up. Every file is
+    self-contained — the animation lives inside the SVG, so it plays in an
+    <code>&lt;img&gt;</code>, a slide deck, or a README with nothing else attached.
+  </p>
+
+  <div class="hero">
+    <img src="logo.svg" alt="AI Code Archaeologist logo, animated">
+    <div class="lockup">
+      <img src="mark.svg" alt="">
+      <div>
+        <div class="name">AI Code <b>Archaeologist</b></div>
+        <div class="tag">Drop in a codebase. Get an X-ray of how it works.</div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Variants</h2>
+  <div class="grid">
+    <div class="card">
+      <img src="logo.svg" width="120" height="120" alt="Full mark on dark">
+      <span class="label">logo.svg — dark</span>
+    </div>
+    <div class="card light">
+      <img src="logo-light.svg" width="120" height="120" alt="Full mark on light">
+      <span class="label">logo-light.svg</span>
+    </div>
+    <div class="card">
+      <img src="mark.svg" width="120" height="120" alt="Simplified mark">
+      <span class="label">mark.svg — small sizes</span>
+    </div>
+  </div>
+
+  <h2>How it holds up small</h2>
+  <div class="card sizes" style="justify-content:center">
+    <figure><img src="logo.svg" width="128" height="128" alt=""><figcaption>128px</figcaption></figure>
+    <figure><img src="logo.svg" width="64" height="64" alt=""><figcaption>64px</figcaption></figure>
+    <figure><img src="mark.svg" width="32" height="32" alt=""><figcaption>32px · mark</figcaption></figure>
+    <figure><img src="mark.svg" width="16" height="16" alt=""><figcaption>16px · favicon</figcaption></figure>
+  </div>
+
+  <h2>Which file to use</h2>
+  <table>
+    <tr><th>File</th><th>Use it for</th></tr>
+    <tr><td class="mono">logo.svg</td><td>Anything 48px and up on a dark background — slides, the title screen, the README header.</td></tr>
+    <tr><td class="mono">logo-light.svg</td><td>The same, on a white or light background. The cyan is deepened so it does not wash out.</td></tr>
+    <tr><td class="mono">mark.svg</td><td>Favicons, avatars, the navbar — anything under 48px, where the sweep and markers turn to mush.</td></tr>
+  </table>
+
+  <h2>Dropping it in</h2>
+  <pre>&lt;!-- animates on its own, no CSS needed --&gt;
+&lt;<b>img</b> src="brand/logo.svg" width="120" height="120" alt="AI Code Archaeologist"&gt;
+
+&lt;!-- as the browser tab icon --&gt;
+&lt;<b>link</b> rel="icon" href="brand/mark.svg"&gt;
+
+&lt;!-- in a README on GitHub --&gt;
+&lt;<b>p</b> align="center"&gt;&lt;img src="brand/logo.svg" width="140"&gt;&lt;/p&gt;</pre>
+
+  <footer>
+    Motion stops automatically for anyone who has <span class="mono">prefers-reduced-motion</span>
+    switched on — the mark still reads, it just holds still.
+  </footer>
+
+</div>
+</body>
+</html>

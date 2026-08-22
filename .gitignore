@@ -1,0 +1,11 @@
+# Firebase CLI leftovers
+.firebase/
+firebase-debug.log
+*.log
+
+# never commit a key — app.yaml has a commented-out slot for one
+.env
+*.key
+
+# scratch probes
+__*.html

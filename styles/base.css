@@ -1,0 +1,215 @@
+/* ======================================================================
+   base.css — design tokens, reset, typography, motion primitives
+   ====================================================================== */
+
+:root {
+  /* surfaces */
+  --bg:          #07090f;
+  --bg-1:        #0c1018;
+  --bg-2:        #11161f;
+  --bg-3:        #171d28;
+  --line:        #222a37;
+  --line-soft:   #1a212c;
+
+  /* text */
+  --text:        #e8ecf3;
+  --text-dim:    #98a2b3;
+  --text-faint:  #6b7383;
+
+  /* brand — "x-ray" cyan */
+  --accent:      #38e0d0;
+  --accent-2:    #4d9fff;
+  --accent-ink:  #041613;
+  --accent-glow: rgba(56, 224, 208, .16);
+
+  /* semantic — impact levels */
+  --high:        #ff5d5d;
+  --med:         #ffb63d;
+  --low:         #4ade80;
+  --high-bg:     rgba(255, 93, 93, .12);
+  --med-bg:      rgba(255, 182, 61, .12);
+  --low-bg:      rgba(74, 222, 128, .12);
+
+  /* layer colors — graph nodes */
+  --layer-ui:    #4d9fff;
+  --layer-logic: #a78bfa;
+  --layer-api:   #38e0d0;
+  --layer-data:  #f59e0b;
+  --layer-other: #8b93a3;
+
+  --radius:    14px;
+  --radius-sm: 9px;
+  --radius-lg: 22px;
+
+  --shadow:    0 18px 50px -12px rgba(0, 0, 0, .7);
+  --shadow-sm: 0 4px 18px -6px rgba(0, 0, 0, .5);
+
+  --ease:      cubic-bezier(.22, 1, .36, 1);
+  --ease-soft: cubic-bezier(.4, 0, .2, 1);
+
+  --nav-h: 62px;
+  --maxw: 1240px;
+}
+
+[data-theme="light"] {
+  --bg:          #f7f8fa;
+  --bg-1:        #ffffff;
+  --bg-2:        #ffffff;
+  --bg-3:        #f1f3f7;
+  --line:        #e2e6ee;
+  --line-soft:   #edf0f5;
+
+  --text:        #0d1220;
+  --text-dim:    #5b6474;
+  --text-faint:  #8b93a3;
+
+  --accent:      #0d9488;
+  --accent-2:    #2563eb;
+  --accent-ink:  #ffffff;
+  --accent-glow: rgba(13, 148, 136, .12);
+
+  --high:        #dc2626;
+  --med:         #d97706;
+  --low:         #16a34a;
+  --high-bg:     rgba(220, 38, 38, .09);
+  --med-bg:      rgba(217, 119, 6, .09);
+  --low-bg:      rgba(22, 163, 74, .09);
+
+  --layer-ui:    #2563eb;
+  --layer-logic: #7c3aed;
+  --layer-api:   #0d9488;
+  --layer-data:  #d97706;
+  --layer-other: #6b7280;
+
+  --shadow:    0 18px 44px -16px rgba(15, 23, 42, .18);
+  --shadow-sm: 0 3px 14px -6px rgba(15, 23, 42, .14);
+}
+
+/* ---- reset ----------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 15.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background .35s var(--ease-soft), color .35s var(--ease-soft);
+}
+
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -.022em; line-height: 1.14; }
+h1 { font-size: clamp(2.3rem, 5.4vw, 4rem); letter-spacing: -.035em; }
+h2 { font-size: clamp(1.7rem, 3.4vw, 2.5rem); letter-spacing: -.03em; }
+h3 { font-size: 1.08rem; }
+p  { margin: 0; }
+a  { color: inherit; text-decoration: none; }
+button, input, textarea, select { font: inherit; color: inherit; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+
+code, pre, .mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .82rem;
+  font-variant-ligatures: none;
+}
+
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: .5rem;
+  z-index: 999;
+  padding: .6rem 1rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+.skip-link:focus { left: .5rem; }
+
+#main { outline: none; }
+
+/* ---- scrollbars ------------------------------------------------------ */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: content-box; }
+
+/* ---- layout helpers -------------------------------------------------- */
+.wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding: 0 clamp(1.1rem, 4vw, 2.5rem); }
+.narrow { max-width: 900px; }
+.center { text-align: center; }
+.dim { color: var(--text-dim); }
+.faint { color: var(--text-faint); }
+.row { display: flex; align-items: center; gap: .6rem; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- motion primitives ----------------------------------------------- */
+@keyframes fade-up   { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scale-in  { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes slide-left{ from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
+@keyframes pulse-ring{
+  0%   { box-shadow: 0 0 0 0 var(--accent-glow); }
+  70%  { box-shadow: 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes dash-flow { to { stroke-dashoffset: -1000; } }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-7px); }
+}
+@keyframes shimmer {
+  0%   { background-position: -420px 0; }
+  100% { background-position: 420px 0; }
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+.anim-fade-up  { animation: fade-up .62s var(--ease) both; }
+.anim-fade-in  { animation: fade-in .5s var(--ease-soft) both; }
+.anim-scale-in { animation: scale-in .45s var(--ease) both; }
+
+/* scroll-reveal — driven by IntersectionObserver in js/lib/reveal.js */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity .7s var(--ease), transform .7s var(--ease);
+  will-change: opacity, transform;
+}
+[data-reveal].in { opacity: 1; transform: none; }
+
+/* page transition */
+.page { animation: fade-up .5s var(--ease) both; }
+.page-leave { animation: fade-in .18s reverse both; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  [data-reveal] { opacity: 1; transform: none; }
+}

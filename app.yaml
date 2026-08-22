@@ -1,0 +1,16 @@
+# Google App Engine (Python) — runs server.py, so the AI answers work too.
+#   gcloud app deploy
+runtime: python312
+entrypoint: python server.py
+
+instance_class: F1
+automatic_scaling:
+  min_instances: 0
+  max_instances: 2
+
+env_variables:
+  HOST: "0.0.0.0"
+  # Do NOT put a real key here if this file is committed to a public repo.
+  # Prefer:  gcloud app deploy --set-env-vars AI_API_KEY=...
+  # AI_API_KEY: "xai-..."
+  # AI_MODEL: "grok-3"

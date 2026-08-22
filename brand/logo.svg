@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512"
+     role="img" aria-label="AI Code Archaeologist">
+  <title>AI Code Archaeologist</title>
+
+  <defs>
+    <linearGradient id="sweep" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0%"   stop-color="#38e0d0" stop-opacity=".55"/>
+      <stop offset="55%"  stop-color="#38e0d0" stop-opacity=".14"/>
+      <stop offset="100%" stop-color="#38e0d0" stop-opacity="0"/>
+    </linearGradient>
+
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#8ffff2"/>
+      <stop offset="60%"  stop-color="#38e0d0"/>
+      <stop offset="100%" stop-color="#4d9fff"/>
+    </radialGradient>
+
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    /* Everything animates from the same centre so the marks stay concentric. */
+    .spin-slow, .spin-fast, .sweep { transform-origin: 32px 32px; }
+
+    .spin-slow { animation: spin 22s linear infinite; }
+    .spin-fast { animation: spin-rev 14s linear infinite; }
+    .sweep     { animation: spin 3.6s linear infinite; }
+
+    .core  { animation: pulse 2.4s ease-in-out infinite; transform-origin: 32px 32px; }
+    .tick  { animation: flicker 2.4s ease-in-out infinite; }
+
+    /* the three "found something" dots — the point of the product */
+    .find      { animation: found 3.6s ease-in-out infinite; }
+    .find-2    { animation-delay: 1.2s; }
+    .find-3    { animation-delay: 2.4s; }
+
+    @keyframes spin      { to { transform: rotate(360deg); } }
+    @keyframes spin-rev  { to { transform: rotate(-360deg); } }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1);    opacity: 1; }
+      50%      { transform: scale(1.18); opacity: .82; }
+    }
+    @keyframes flicker {
+      0%, 100% { opacity: .8; }
+      50%      { opacity: .35; }
+    }
+    @keyframes found {
+      0%, 72%   { opacity: 0; transform: scale(.4); }
+      78%       { opacity: 1; transform: scale(1.35); }
+      88%, 100% { opacity: 0; transform: scale(1); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .spin-slow, .spin-fast, .sweep, .core, .tick, .find {
+        animation: none;
+      }
+      .find { opacity: .9; }
+    }
+  </style>
+
+  <!-- radar sweep, behind everything -->
+  <g class="sweep">
+    <path d="M32,32 L32,6 A26,26 0 0,1 50.38,13.62 Z" fill="url(#sweep)"/>
+  </g>
+
+  <!-- outer dashed ring: the area still being searched -->
+  <circle class="spin-slow" cx="32" cy="32" r="26"
+          fill="none" stroke="#38e0d0" stroke-opacity=".28"
+          stroke-width="1.6" stroke-dasharray="7 6" stroke-linecap="round"/>
+
+  <!-- inner ring, turning the other way -->
+  <circle class="spin-fast" cx="32" cy="32" r="19"
+          fill="none" stroke="#4d9fff" stroke-opacity=".45"
+          stroke-width="1.2" stroke-dasharray="2 5" stroke-linecap="round"/>
+
+  <!-- the lens -->
+  <circle cx="32" cy="32" r="12.5" fill="none" stroke="#38e0d0" stroke-width="2.2"/>
+
+  <!-- crosshair ticks -->
+  <g class="tick" stroke="#38e0d0" stroke-width="2.4" stroke-linecap="round">
+    <path d="M32 2.5v6"/>
+    <path d="M32 55.5v6"/>
+    <path d="M2.5 32h6"/>
+    <path d="M55.5 32h6"/>
+  </g>
+
+  <!-- things the scan has turned up -->
+  <g fill="#4d9fff">
+    <circle class="find"        cx="43.5" cy="21.5" r="2.4"/>
+    <circle class="find find-2" cx="21.5" cy="41"   r="2.4"/>
+    <circle class="find find-3" cx="43"   cy="43"   r="2.4"/>
+  </g>
+
+  <!-- core -->
+  <circle class="core" cx="32" cy="32" r="5" fill="url(#core)" filter="url(#glow)"/>
+</svg>
