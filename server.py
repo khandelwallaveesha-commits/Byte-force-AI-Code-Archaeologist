@@ -48,6 +48,7 @@ Anthropic's API uses a different request shape and would need a small adapter.
 
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -126,7 +127,14 @@ def _post_json(url, payload, headers, timeout=TIMEOUT):
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", **headers},
+        headers={
+            "Content-Type": "application/json",
+            # Groq sits behind Cloudflare, which rejects Python's default
+            # "Python-urllib/3.x" agent with a 403 (error 1010) before the
+            # request ever reaches the API. Identify properly.
+            "User-Agent": "AICodeArchaeologist/1.0 (+https://github.com/khandelwallaveesha-commits/Byte-force-AI-Code-Archaeologist)",
+            **headers,
+        },
         method="POST",
     )
     with urllib.request.urlopen(req, timeout=timeout) as res:
@@ -164,9 +172,28 @@ def ask_model(question, context):
         return None, f"Unexpected problem talking to the model: {e}"
 
     try:
-        return data["choices"][0]["message"]["content"].strip(), None
+        message = data["choices"][0]["message"]
     except (KeyError, IndexError, TypeError):
         return None, f"The model service replied in a shape I did not expect: {str(data)[:300]}"
+
+    answer = (message.get("content") or "").strip()
+
+    # Reasoning models put their scratch work in the answer. Qwen wraps it in
+    # <think> tags; strip those so the reader never sees the model talking to
+    # itself about "banned words".
+    answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.S).strip()
+    answer = re.sub(r"^<think>.*", "", answer, flags=re.S).strip()
+
+    if not answer:
+        # Some models (openai/gpt-oss-20b on Groq) return only a `reasoning`
+        # field and an empty `content`. Silently showing that blank looks like
+        # the app is broken, so say what happened and let the rules answer.
+        return None, (
+            f'The model "{MODEL}" replied with no usable text. '
+            f"Try a different AI_MODEL — openai/gpt-oss-120b works well here."
+        )
+
+    return answer, None
 
 
 class Handler(SimpleHTTPRequestHandler):

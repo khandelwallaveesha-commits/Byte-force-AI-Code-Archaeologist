@@ -37,9 +37,15 @@ export AI_API_KEY=xai-...     # macOS / Linux
 | Variable | Default | |
 | --- | --- | --- |
 | `AI_API_KEY` | — | without it, AI is simply off |
-| `AI_BASE_URL` | `https://api.x.ai/v1/chat/completions` | any OpenAI-shaped endpoint |
-| `AI_MODEL` | `grok-3` | if the name is wrong the provider says so, verbatim |
+| `AI_BASE_URL` | `https://api.groq.com/openai/v1/chat/completions` | any OpenAI-shaped endpoint — Groq, xAI, OpenAI, Ollama |
+| `AI_MODEL` | `openai/gpt-oss-120b` | if the name is wrong the provider says so, verbatim |
 | `PORT` | `8010` | |
+
+Two provider quirks are handled, because both look like "the AI is broken":
+Groq sits behind Cloudflare and rejects Python's default user-agent with a 403,
+so the request identifies itself properly; and some models return their
+reasoning with an empty answer, or paste `<think>` notes into it, so empty
+replies are reported and think-blocks are stripped.
 
 The key lives in the server process, never in the page. Anthropic's API uses a
 different request shape and would need a small adapter.
