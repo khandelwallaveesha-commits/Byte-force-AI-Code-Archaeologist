@@ -1,4 +1,4 @@
-# Putting this on the internet, on Google, for free
+# Putting this on the internet, for free
 
 There are two halves to this app, and they host differently:
 
@@ -102,13 +102,80 @@ demo costs nothing.
 
 ---
 
+---
+
+## Option D — Vercel (recommended: free, no card, and the AI keeps working)
+
+The only free option here that runs Python **and** does not ask for a card,
+which means `/api/ask` works on the live site and the chat gives real answers
+instead of falling back to its rules.
+
+`server.py` is not what runs there. Vercel turns each file under `api/` into
+its own small function named after the file, so `api/ask.py` answers
+`/api/ask` and `api/ai-status.py` answers `/api/ai-status` — the same two URLs
+`server.py` answers locally. The browser cannot tell the difference, and one
+build works in both places. Both files are standard-library only: no
+`requirements.txt`, nothing to install, nothing to break at build time.
+
+### 1. Import the repository
+
+<https://vercel.com/new> → sign in with GitHub → pick
+**Byte-force-AI-Code-Archaeologist** → **Import**.
+
+Leave every setting alone. Framework preset **Other**, no build command, no
+output directory. `vercel.json` is already written.
+
+### 2. Add the key
+
+Before the first deploy — or afterwards in **Settings → Environment
+Variables**, then **Redeploy**:
+
+| Name | Value |
+| --- | --- |
+| `AI_API_KEY` | your `gsk_...` key |
+| `AI_BASE_URL` | `https://api.groq.com/openai/v1/chat/completions` |
+| `AI_MODEL` | `openai/gpt-oss-120b` |
+
+Tick all three environments (Production, Preview, Development).
+
+**Never commit the key.** It belongs in that screen and in your local `.env`,
+both of which stay out of the repository.
+
+### 3. Deploy
+
+Vercel builds and gives you `https://your-project.vercel.app`. Every later
+`git push` redeploys it on its own.
+
+To check the AI came up, open `/api/ai-status` on the live site. It should say
+`"enabled": true`. If it says false, the environment variable did not save, or
+the project was not redeployed after it did.
+
+> `ask.py` is allowed 60 seconds in `vercel.json` and gives up on the model at
+> 45. Groq answers in about 3–7 seconds; the headroom is for a cold start.
+> `.vercelignore` keeps `.env`, `server.py` and the other hosts' files out of
+> the upload — the CLI does not read `.gitignore`, so that file matters.
+
+---
+
 ## Which to choose
 
-For a hackathon demo, **Option A**. It is free with no card, deploys in one
-command, and the parts judges will actually poke at — upload a repo, watch the
-map build, click a file, ask what breaks — are all client-side and work fully.
+**Option D, Vercel.** It is the only one that is free, needs no card, and
+still runs the Python that makes the chat give real answers. Import the repo,
+paste three environment variables, done.
 
-Take Option B only if an AI-written answer is central to what you are showing.
+Everything the judges will actually poke at — upload a repo, watch the map
+build, click a file, follow a branch, ask what breaks — is client-side and
+works on every option here. The AI chat is the only difference:
+
+| | Card needed | AI chat |
+| --- | --- | --- |
+| **D — Vercel** | no | **real answers** |
+| B — App Engine | yes | real answers |
+| A — Firebase | no | built-in rules |
+| C — GitHub Pages | no | built-in rules |
+
+The rule-based fallback is not a failure state — it is why a demo never dies
+on stage. But if you can have the real thing for free, have it.
 
 ---
 

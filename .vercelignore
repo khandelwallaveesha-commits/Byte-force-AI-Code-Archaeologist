@@ -1,0 +1,21 @@
+# The key lives in Vercel's own environment variables, never in an uploaded
+# file. .gitignore already keeps .env out of the repository; this keeps it out
+# of a `vercel` CLI upload too, which does not read .gitignore.
+.env
+*.key
+
+# Belongs to the other hosts, not this one
+server.py
+app.yaml
+.gcloudignore
+firebase.json
+deploy.cmd
+deploy.sh
+.firebase/
+
+# Docs — nothing serves them
+DEPLOY.md
+
+# Scratch probes
+__*.html
+*.log

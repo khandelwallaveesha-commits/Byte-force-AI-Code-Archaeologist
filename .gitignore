@@ -9,3 +9,7 @@ firebase-debug.log
 
 # scratch probes
 __*.html
+
+# Python bytecode from a local test run
+__pycache__/
+*.pyc
